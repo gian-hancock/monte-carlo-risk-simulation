@@ -179,7 +179,7 @@ fn write_samples_as_csv<Sink: Write>(
 ) -> std::io::Result<()> {
     write!(sink, "Sample")?;
     for column_header in tasks.iter().map(|t| t.name.as_str()) {
-        write!(sink, "{column_header}")?;
+        write!(sink, "{column_header},")?;
     }
     write!(sink, "\n")?;
     for sample_idx in 0..SAMPLE_COUNT {
