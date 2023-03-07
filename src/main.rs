@@ -30,7 +30,7 @@ fn main() -> std::io::Result<()> {
     let mut tasks = parse_tasks_from_csv(fs::read_to_string(INPUT_PATH)?.as_str()).unwrap();
 
     // Generate samples
-    let task_samples: Vec<TaskSamples> = sample_task_estimates(&tasks, SAMPLE_COUNT);
+    let task_samples: Vec<Vec<f64>> = sample_task_estimates(&tasks, SAMPLE_COUNT);
     tasks.push(total_task);
 
     // Output samples to file
@@ -49,7 +49,10 @@ fn main() -> std::io::Result<()> {
 
     // Calculate stats on samples
     let mut stats_output_file = File::create(OUTPUT_PATH_STATS)?;
-    let stats = write_stats_as_csv(&mut stats_output_file, tasks.iter().zip(task_samples.iter()));
+    let stats = write_stats_as_csv(
+        &mut stats_output_file,
+        tasks.iter().zip(task_samples.iter()),
+    );
     dbg!(stats);
 
     Ok(())
@@ -107,16 +110,16 @@ fn parse_tasks_from_csv(csv_text: &str) -> Result<Vec<Task>, ()> {
 // pair.
 fn write_stats_as_csv<'a>(
     sink: &mut impl Write,
-    task_samples: impl Iterator<Item = (&'a Task, &'a TaskSamples)>,
+    task_samples: impl Iterator<Item = (&'a Task, &'a Vec<f64>)>,
 ) {
     for (task, samples) in task_samples {
         // CONSIDER: moving this sort up the call stack, or even performing it incrementally as
         // samples are produced.
-        let mut sorted_samples = samples.samples.clone();
+        let mut sorted_samples = samples.clone();
         sorted_samples.sort_by(f64::total_cmp);
 
         let get_percentile = |percentile: usize| {
-            let sample_idx = ((samples.samples.len() - 1) * percentile) / 100;
+            let sample_idx = ((samples.len() - 1) * percentile) / 100;
             sorted_samples[sample_idx]
         };
 
@@ -127,7 +130,7 @@ fn write_stats_as_csv<'a>(
             let value = get_percentile(percentile);
             println!(
                 "{percentile}, {}, {}, {percentile}, {value}",
-                samples.samples.len(),
+                samples.len(),
                 task.name
             );
             percentiles.push((percentile, value));
@@ -149,13 +152,13 @@ fn write_stats_as_csv<'a>(
         println!("Median: {}", get_percentile(50));
 
         // MEAN
-        let mean = samples.samples.iter().sum::<f64>() / samples.samples.len() as f64;
+        let mean = samples.iter().sum::<f64>() / samples.len() as f64;
         println!("Mean: {mean}");
 
         // Stdev
         let mut stdev = 0.0;
-        for sample in &samples.samples {
-            stdev += (sample - mean).powi(2) / samples.samples.len() as f64;
+        for sample in samples {
+            stdev += (sample - mean).powi(2) / samples.len() as f64;
         }
         println!("Stdev: {stdev}");
 
@@ -172,10 +175,10 @@ fn write_stats_as_csv<'a>(
     }
 }
 
-fn write_samples_as_csv<Sink: Write>(
+fn write_samples_as_csv(
     tasks: &Vec<Task>,
-    sink: &mut Sink,
-    samples: &Vec<TaskSamples>,
+    sink: &mut impl Write,
+    samples: &Vec<Vec<f64>>,
 ) -> std::io::Result<()> {
     write!(sink, "Sample")?;
     for column_header in tasks.iter().map(|t| t.name.as_str()) {
@@ -185,7 +188,7 @@ fn write_samples_as_csv<Sink: Write>(
     for sample_idx in 0..SAMPLE_COUNT {
         write!(sink, "{sample_idx},")?;
         for (_, task_samples) in samples.iter().enumerate() {
-            write!(sink, "{},", task_samples.samples[sample_idx])?;
+            write!(sink, "{},", task_samples[sample_idx])?;
         }
         write!(sink, "\n")?;
     }
@@ -241,7 +244,7 @@ fn write_histogram_as_csv(
 
 fn bucket_samples(
     tasks: &[Task],
-    samples: &Vec<TaskSamples>,
+    samples: &Vec<Vec<f64>>,
     bucket_count: usize,
 ) -> Vec<BucketedSamples> {
     let mut task_bucketed_samples = Vec::new();
@@ -251,7 +254,6 @@ fn bucket_samples(
             // let min = samples[task_idx].samples.iter().min_by(|a, b| a.total_cmp(b)).unwrap();
             let min = 0.0;
             let max = samples[task_idx]
-                .samples
                 .iter()
                 .max_by(|a, b| a.total_cmp(b))
                 .unwrap();
@@ -265,7 +267,7 @@ fn bucket_samples(
             )
         };
         let mut buckets = vec![Vec::new(); bucket_count];
-        for sample in &samples[task_idx].samples {
+        for sample in &samples[task_idx] {
             let bucket_idx = usize::min(((sample - min) / bucket_size) as usize, BUCKET_COUNT - 1);
             // HACK
             buckets[bucket_idx].push(*sample);
@@ -278,7 +280,7 @@ fn bucket_samples(
     task_bucketed_samples
 }
 
-fn sample_task_estimates(tasks: &[Task], sample_count: usize) -> Vec<TaskSamples> {
+fn sample_task_estimates(tasks: &[Task], sample_count: usize) -> Vec<Vec<f64>> {
     let mut rng = thread_rng();
     let mut task_samples = Vec::new();
     for task in tasks {
@@ -292,17 +294,17 @@ fn sample_task_estimates(tasks: &[Task], sample_count: usize) -> Vec<TaskSamples
             );
             samples.push(task_value);
         }
-        task_samples.push(TaskSamples { samples });
+        task_samples.push(samples);
     }
     let mut samples = Vec::new();
     for sample_idx in 0..sample_count {
         let mut sum = 0.0;
         for task_sample in &task_samples {
-            sum += task_sample.samples[sample_idx];
+            sum += task_sample[sample_idx];
         }
         samples.push(sum);
     }
-    task_samples.push(TaskSamples { samples });
+    task_samples.push(samples);
     task_samples
 }
 
@@ -341,10 +343,6 @@ struct Task {
     min: f64,
     mode: f64,
     max: f64,
-}
-
-struct TaskSamples {
-    samples: Vec<f64>,
 }
 
 struct BucketedSamples {
