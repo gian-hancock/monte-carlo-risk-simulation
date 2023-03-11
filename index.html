@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en-US">
+  <head>
+    <meta charset="utf-8" />
+    <title>Monte Carlo Risk Simulation</title>
+  </head>
+  <body>
+    <script type="module">
+      import init, { process_input } from "./pkg/estimation_distributions.js";
+      init().then(() => {
+        let inputElem = document.getElementById("input");
+        let outputElem = document.getElementById("output");
+        input.addEventListener("change", (event) => {
+          let inputText = event.target.value;
+          let outputText = process_input(inputText);
+          console.log(outputText);
+          outputElem.innerText = outputText;
+        });
+      });
+    </script>
+    <h1>Monte Carlo Risk Simulation</h1>
+    <textarea id="input" name="input" rows="4" cols="50"></textarea>
+    <pre id="output"></pre>
+  </body>
+</html>

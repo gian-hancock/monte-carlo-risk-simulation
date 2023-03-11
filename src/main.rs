@@ -1,7 +1,7 @@
 use std::fs::{self, File};
 
 use estimation_distributions::*;
-    
+
 /*
  * - Monte carlo for each task is independant
  * - Generate `SAMPLE` entries for each task and store in Vec
@@ -12,7 +12,7 @@ const INPUT_PATH: &str = "tasks.csv";
 const OUTPUT_PATH_HISTOGRAM: &str = "histogram.csv";
 const OUTPUT_PATH_SAMPLES: &str = "samples.csv";
 const OUTPUT_PATH_STATS: &str = "stats.csv";
-const SAMPLE_COUNT: usize = 50_000;
+const SAMPLE_COUNT: usize = 1_000;
 const BUCKET_COUNT: usize = 35;
 const CHART_LINE_LENGTH: usize = 50;
 const PERCENTILES_COUNT: usize = 11;
@@ -32,7 +32,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Output samples to file
     let mut sample_output_file = File::create(OUTPUT_PATH_SAMPLES)?;
-    write_samples_as_csv(&sampled_tasks, &mut sample_output_file)?;
+    write_samples_as_csv(&mut sample_output_file, &sampled_tasks)?;
 
     // Bucket samples
     let bucketed_samples = bucket_samples(&sampled_tasks[&sampled_tasks.len() - 1..], BUCKET_COUNT);
@@ -40,7 +40,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Draw histogram
     let msg = "Histogram of total values:";
     println!("{msg}\n{}", "=".repeat(msg.len()));
-    write_histogram_as_ascii_art(&bucketed_samples.last().unwrap(), CHART_LINE_LENGTH);
+    write_histogram_as_ascii_art(
+        &mut std::io::stdout(),
+        &bucketed_samples.last().unwrap(),
+        CHART_LINE_LENGTH,
+    )?;
 
     // Write histogram data to CSV
     let mut histogram_output_file = File::create(OUTPUT_PATH_HISTOGRAM)?;
@@ -50,10 +54,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     )?;
 
     // Calculate stats on samples
-    let stats = write_stats_as_csv(&sampled_tasks.last().unwrap(), PERCENTILES_COUNT)?;
+    let stats = calculate_stats(&sampled_tasks.last().unwrap(), PERCENTILES_COUNT)?;
     let mut stats_output_file = File::create(OUTPUT_PATH_STATS)?;
     stats.write_as_csv(&mut stats_output_file)?;
-    stats.write_as_ascii()?;
+    stats.write_as_ascii(&mut std::io::stdout())?;
 
     Ok(())
 }

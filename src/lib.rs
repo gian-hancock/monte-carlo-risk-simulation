@@ -1,6 +1,58 @@
-use std::{io::Write, fmt};
-
 use rand::{thread_rng, Rng};
+use std::{fmt, io::Write};
+use wasm_bindgen::prelude::*;
+
+const SAMPLE_COUNT: usize = 50_000;
+const BUCKET_COUNT: usize = 35;
+const CHART_LINE_LENGTH: usize = 50;
+const PERCENTILES_COUNT: usize = 11;
+
+#[wasm_bindgen]
+pub fn process_input(input: &str) -> String {
+    let mut result_buffer = Vec::<u8>::new();
+    // Parse CSV
+    let tasks = parse_tasks_from_csv(input).unwrap();
+
+    // Generate samples
+    let total_task = Task {
+        name: "Total".to_string(),
+        min: 0.0,
+        mode: 0.0,
+        max: 0.0,
+    };
+    let sampled_tasks = run_monte_carlo(&tasks, SAMPLE_COUNT, &total_task);
+
+    // // Output samples to file
+    // let mut sample_output_file = File::create(OUTPUT_PATH_SAMPLES)?;
+    // write_samples_as_csv(&mut sample_output_file, &sampled_tasks)?;
+
+    // Bucket samples
+    let bucketed_samples = bucket_samples(&sampled_tasks[&sampled_tasks.len() - 1..], BUCKET_COUNT);
+
+    // Draw histogram
+    let msg = "Histogram of total values:";
+    println!("{msg}\n{}", "=".repeat(msg.len()));
+    write_histogram_as_ascii_art(
+        &mut result_buffer,
+        &bucketed_samples.last().unwrap(),
+        CHART_LINE_LENGTH,
+    ).unwrap();
+
+    // // Write histogram data to CSV
+    // let mut histogram_output_file = File::create(OUTPUT_PATH_HISTOGRAM)?;
+    // write_histogram_as_csv(
+    //     &mut histogram_output_file,
+    //     &bucketed_samples.last().unwrap(),
+    // ).unwrap();
+
+    // Calculate stats on samples
+    let stats = calculate_stats(&sampled_tasks.last().unwrap(), PERCENTILES_COUNT).unwrap();
+    // let mut stats_output_file = File::create(OUTPUT_PATH_STATS)?;
+    // stats.write_as_csv(&mut stats_output_file)?;
+    stats.write_as_ascii(&mut result_buffer).unwrap();
+    String::from_utf8(result_buffer).unwrap()
+}
+    
 
 pub fn parse_tasks_from_csv(csv_text: &str) -> Result<Vec<Task>, Error> {
     let mut lines = csv_text.lines();
@@ -49,9 +101,10 @@ pub fn parse_tasks_from_csv(csv_text: &str) -> Result<Vec<Task>, Error> {
     Ok(result)
 }
 
-// CONSIDER: Why operate on an iterator here? Consider operating on a single (Task, TaskSamples)
-// pair.
-pub fn write_stats_as_csv<'a>(sampled_task: &SampledTask, percentile_count: usize) -> Result<Stats, std::io::Error> {
+pub fn calculate_stats<'a>(
+    sampled_task: &SampledTask,
+    percentile_count: usize,
+) -> Result<Stats, std::io::Error> {
     // CONSIDER: moving this sort up the call stack, or even performing it incrementally as
     // samples are produced.
     let mut sorted_samples = sampled_task.samples.clone();
@@ -99,8 +152,8 @@ pub fn write_stats_as_csv<'a>(sampled_task: &SampledTask, percentile_count: usiz
 }
 
 pub fn write_samples_as_csv(
-    sampled_tasks: &Vec<SampledTask>,
     sink: &mut impl Write,
+    sampled_tasks: &Vec<SampledTask>,
 ) -> std::io::Result<()> {
     write!(sink, "Sample")?;
     for column_header in sampled_tasks.iter().map(|t| t.task.name.as_str()) {
@@ -117,9 +170,16 @@ pub fn write_samples_as_csv(
     Ok(())
 }
 
-pub fn write_histogram_as_ascii_art(bucketed_sampled_task: &BucketedSamples, chart_line_length: usize) {
+pub fn write_histogram_as_ascii_art(
+    sink: &mut impl Write,
+    bucketed_sampled_task: &BucketedSamples,
+    chart_line_length: usize,
+) -> std::io::Result<()> {
     let bucket_half_range = bucketed_sampled_task.bucket_size / 2.0;
-    println!("Each line represents bucket midpoint ± {bucket_half_range:.3}");
+    write!(
+        sink,
+        "Each line represents bucket midpoint ± {bucket_half_range:.3}\n"
+    )?;
     let sampled_task = bucketed_sampled_task.sampled_task;
     let largest_bucket_sample_count = bucketed_sampled_task
         .buckets
@@ -134,12 +194,13 @@ pub fn write_histogram_as_ascii_art(bucketed_sampled_task: &BucketedSamples, cha
         let bucket_sample_count = bucket.len();
         let bucket_line_size =
             (chart_line_length * bucket_sample_count) / largest_bucket_sample_count;
-        print!("{bucket_midpoint:6.2}: ");
+        write!(sink, "{bucket_midpoint:6.2}: ")?;
         for _ in 0..bucket_line_size {
-            print!("#");
+            write!(sink, "#")?;
         }
-        println!();
+        write!(sink, "\n")?;
     }
+    Ok(())
 }
 
 pub fn write_histogram_as_csv(
@@ -257,7 +318,6 @@ fn triangular_distribution_inv_cdf(probability: f64, min: f64, mode: f64, max: f
     }
 }
 
-
 #[derive(Debug)]
 pub struct Task {
     pub name: String,
@@ -304,18 +364,17 @@ impl Stats {
         Ok(())
     }
 
-    pub fn write_as_ascii(&self) -> Result<(), std::io::Error> {
+    pub fn write_as_ascii(&self, sink: &mut impl Write) -> Result<(), std::io::Error> {
         // Percentiles
         let msg = "Percentiles";
-        println!("\n{msg}\n{}", "=".repeat(msg.len()));
+        write!(sink, "\n{msg}\n{}\n", "=".repeat(msg.len()))?;
         for (percentile, value) in &self.percentiles {
-            println!("| {percentile:3} | {value:5.2} |");
-            // print!("{bucket_start:6.2}-{bucket_end:5.2}: ");
+            write!(sink, "| {percentile:3} | {value:5.2} |\n")?;
         }
 
         // Statistics
         let msg = "Statistics";
-        println!("\n{msg}\n{}", "=".repeat(msg.len()));
+        write!(sink, "\n{msg}\n{}\n", "=".repeat(msg.len()))?;
         let stats = vec![
             ("Lower quartile", format!("{:.2}", self.iqr_lower)),
             ("Upper quartile", format!("{:.2}", self.iqr_upper)),
@@ -327,7 +386,7 @@ impl Stats {
         let longest_key = stats.iter().map(|(key, _)| key.len()).max().unwrap();
         let longest_value = &stats.iter().map(|(_, value)| value.len()).max().unwrap();
         for (key, value) in stats {
-            println!("| {key:0$} | {value:1$} |", longest_key, longest_value);
+            write!(sink, "| {key:0$} | {value:1$} |\n", longest_key, longest_value)?;
         }
         Ok(())
     }
