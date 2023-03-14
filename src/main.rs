@@ -1,4 +1,4 @@
-use std::fs::{self, File};
+use std::{fs::{self, File}, io::BufWriter};
 
 use estimation_distributions::*;
 
@@ -12,7 +12,7 @@ const INPUT_PATH: &str = "tasks.csv";
 const OUTPUT_PATH_HISTOGRAM: &str = "histogram.csv";
 const OUTPUT_PATH_SAMPLES: &str = "samples.csv";
 const OUTPUT_PATH_STATS: &str = "stats.csv";
-const SAMPLE_COUNT: usize = 100_000;
+const SAMPLE_COUNT: usize = 1_000_000;
 const BUCKET_COUNT: usize = 35;
 const CHART_LINE_LENGTH: usize = 50;
 const PERCENTILES_COUNT: usize = 11;
@@ -31,8 +31,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let sampled_tasks = run_monte_carlo(&tasks, SAMPLE_COUNT, &total_task);
 
     // Output samples to file
-    let mut sample_output_file = File::create(OUTPUT_PATH_SAMPLES)?;
-    write_samples_as_csv(&mut sample_output_file, &sampled_tasks)?;
+    let mut samples_buf_writer = BufWriter::new(File::create(OUTPUT_PATH_SAMPLES)?);
+    write_samples_as_csv(&mut samples_buf_writer, &sampled_tasks)?;
 
     // Bucket samples
     let bucketed_samples = bucket_samples(&sampled_tasks[&sampled_tasks.len() - 1..], BUCKET_COUNT);
@@ -47,16 +47,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     )?;
 
     // Write histogram data to CSV
-    let mut histogram_output_file = File::create(OUTPUT_PATH_HISTOGRAM)?;
+    let mut histogram_buf_writer = BufWriter::new(File::create(OUTPUT_PATH_HISTOGRAM)?);
     write_histogram_as_csv(
-        &mut histogram_output_file,
+        &mut histogram_buf_writer,
         &bucketed_samples.last().unwrap(),
     )?;
 
     // Calculate stats on samples
     let stats = calculate_stats(&sampled_tasks.last().unwrap(), PERCENTILES_COUNT)?;
-    let mut stats_output_file = File::create(OUTPUT_PATH_STATS)?;
-    stats.write_as_csv(&mut stats_output_file)?;
+    let mut stats_buf_writer = BufWriter::new(File::create(OUTPUT_PATH_STATS)?);
+    stats.write_as_csv(&mut stats_buf_writer)?;
     stats.write_as_ascii(&mut std::io::stdout())?;
 
     Ok(())
