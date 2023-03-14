@@ -3,17 +3,17 @@
   <head>
     <meta charset="utf-8" />
     <title>Monte Carlo Risk Simulation</title>
+    <link rel="shortcut icon" type="image/png" href="favicon.ico">
   </head>
   <body>
     <script type="module">
-      import init, { process_input } from "./pkg/estimation_distributions.js";
+      import init, { process_input } from "./github_pages/estimation_distributions.js";
       init().then(() => {
         let inputElem = document.getElementById("input");
         let outputElem = document.getElementById("output");
         input.addEventListener("change", (event) => {
           let inputText = event.target.value;
           let outputText = process_input(inputText);
-          console.log(outputText);
           outputElem.innerText = outputText;
         });
       });
