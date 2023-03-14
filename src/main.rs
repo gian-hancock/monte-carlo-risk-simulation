@@ -42,7 +42,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("{msg}\n{}", "=".repeat(msg.len()));
     write_histogram_as_ascii_art(
         &mut std::io::stdout(),
-        &bucketed_samples.last().unwrap(),
+        bucketed_samples.last().unwrap(),
         CHART_LINE_LENGTH,
     )?;
 
@@ -50,11 +50,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut histogram_buf_writer = BufWriter::new(File::create(OUTPUT_PATH_HISTOGRAM)?);
     write_histogram_as_csv(
         &mut histogram_buf_writer,
-        &bucketed_samples.last().unwrap(),
+        bucketed_samples.last().unwrap(),
     )?;
 
     // Calculate stats on samples
-    let stats = calculate_stats(&sampled_tasks.last().unwrap(), PERCENTILES_COUNT)?;
+    let stats = calculate_stats(sampled_tasks.last().unwrap(), PERCENTILES_COUNT)?;
     let mut stats_buf_writer = BufWriter::new(File::create(OUTPUT_PATH_STATS)?);
     stats.write_as_csv(&mut stats_buf_writer)?;
     stats.write_as_ascii(&mut std::io::stdout())?;

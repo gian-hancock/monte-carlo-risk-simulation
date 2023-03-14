@@ -34,7 +34,7 @@ pub fn process_input(input: &str) -> String {
     println!("{msg}\n{}", "=".repeat(msg.len()));
     write_histogram_as_ascii_art(
         &mut result_buffer,
-        &bucketed_samples.last().unwrap(),
+        bucketed_samples.last().unwrap(),
         CHART_LINE_LENGTH,
     ).unwrap();
 
@@ -46,7 +46,7 @@ pub fn process_input(input: &str) -> String {
     // ).unwrap();
 
     // Calculate stats on samples
-    let stats = calculate_stats(&sampled_tasks.last().unwrap(), PERCENTILES_COUNT).unwrap();
+    let stats = calculate_stats(sampled_tasks.last().unwrap(), PERCENTILES_COUNT).unwrap();
     // let mut stats_output_file = File::create(OUTPUT_PATH_STATS)?;
     // stats.write_as_csv(&mut stats_output_file)?;
     stats.write_as_ascii(&mut result_buffer).unwrap();
@@ -61,7 +61,7 @@ pub fn parse_tasks_from_csv(csv_text: &str) -> Result<Vec<Task>, Error> {
     let header_line = lines.next().ok_or(Error {
         msg: "no header line found".to_string(),
     })?;
-    let headers = header_line.split(",");
+    let headers = header_line.split(',');
     let mut column_idx_name = None;
     let mut column_idx_min = None;
     let mut column_idx_mode = None;
@@ -75,10 +75,10 @@ pub fn parse_tasks_from_csv(csv_text: &str) -> Result<Vec<Task>, Error> {
             _ => (),
         }
     }
-    if column_idx_name == None
-        || column_idx_min == None
-        || column_idx_mode == None
-        || column_idx_max == None
+    if column_idx_name.is_none()
+        || column_idx_min.is_none()
+        || column_idx_mode.is_none()
+        || column_idx_max.is_none()
     {
         return Err(Error {
             msg: "missing column value".to_string(),
@@ -88,7 +88,7 @@ pub fn parse_tasks_from_csv(csv_text: &str) -> Result<Vec<Task>, Error> {
     let mut result = Vec::new();
     // Process tasks
     for task_line in lines {
-        let cells: Vec<&str> = task_line.split(",").collect();
+        let cells: Vec<&str> = task_line.split(',').collect();
         // FIXME: Unwraps
         result.push(Task {
             name: cells[column_idx_name.unwrap()].to_owned(),
@@ -101,7 +101,7 @@ pub fn parse_tasks_from_csv(csv_text: &str) -> Result<Vec<Task>, Error> {
     Ok(result)
 }
 
-pub fn calculate_stats<'a>(
+pub fn calculate_stats(
     sampled_task: &SampledTask,
     percentile_count: usize,
 ) -> Result<Stats, std::io::Error> {
@@ -159,13 +159,13 @@ pub fn write_samples_as_csv(
     for column_header in sampled_tasks.iter().map(|t| t.task.name.as_str()) {
         write!(sink, "{column_header},")?;
     }
-    write!(sink, "\n")?;
+    writeln!(sink)?;
     for sample_idx in 0..sampled_tasks[0].samples.len() {
         write!(sink, "{sample_idx},")?;
         for sampled_task in sampled_tasks {
             write!(sink, "{},", sampled_task.samples[sample_idx])?;
         }
-        write!(sink, "\n")?;
+        writeln!(sink)?;
     }
     Ok(())
 }
@@ -176,9 +176,9 @@ pub fn write_histogram_as_ascii_art(
     chart_line_length: usize,
 ) -> std::io::Result<()> {
     let bucket_half_range = bucketed_sampled_task.bucket_size / 2.0;
-    write!(
+    writeln!(
         sink,
-        "Each line represents bucket midpoint ± {bucket_half_range:.3}\n"
+        "Each line represents bucket midpoint ± {bucket_half_range:.3}"
     )?;
     let sampled_task = bucketed_sampled_task.sampled_task;
     let largest_bucket_sample_count = bucketed_sampled_task
@@ -198,7 +198,7 @@ pub fn write_histogram_as_ascii_art(
         for _ in 0..bucket_line_size {
             write!(sink, "#")?;
         }
-        write!(sink, "\n")?;
+        writeln!(sink)?;
     }
     Ok(())
 }
@@ -208,18 +208,18 @@ pub fn write_histogram_as_csv(
     bucketed_sampled_task: &BucketedSamples,
 ) -> Result<(), std::io::Error> {
     let sampled_task = bucketed_sampled_task.sampled_task;
-    write!(sink, "{}\n", sampled_task.task.name)?;
+    writeln!(sink, "{}", sampled_task.task.name)?;
     for (bucket_idx, bucket) in bucketed_sampled_task.buckets.iter().enumerate() {
         let bucket_start =
             sampled_task.task.min + (bucketed_sampled_task.bucket_size * bucket_idx as f64);
         let bucket_end = bucket_start + bucketed_sampled_task.bucket_size;
         let bucket_sample_count = bucket.len();
-        write!(
+        writeln!(
             sink,
-            "{bucket_start:.2}-{bucket_end:.2}, {bucket_sample_count}\n"
+            "{bucket_start:.2}-{bucket_end:.2}, {bucket_sample_count}"
         )?;
     }
-    write!(sink, "\n")?;
+    writeln!(sink)?;
     Ok(())
 }
 
@@ -309,7 +309,7 @@ pub fn run_monte_carlo<'a>(
 }
 
 fn triangular_distribution_inv_cdf(probability: f64, min: f64, mode: f64, max: f64) -> f64 {
-    assert!(probability >= 0.0 && probability <= 1.0);
+    assert!((0.0..=1.0).contains(&probability));
     let cdf_at_mode = (mode - min) / (max - min);
     if probability <= cdf_at_mode {
         min + f64::sqrt(probability * (mode - min) * (max - min))
@@ -352,15 +352,15 @@ pub struct Stats {
 impl Stats {
     pub fn write_as_csv(&self, sink: &mut impl Write) -> Result<(), std::io::Error> {
         for (percentile, value) in &self.percentiles {
-            write!(sink, "percentile: {percentile},{value}\n")?;
+            writeln!(sink, "percentile: {percentile},{value}")?;
         }
-        write!(sink, "iqr_lower, {}\n", self.iqr_lower)?;
-        write!(sink, "iqr_upper, {}\n", self.iqr_upper)?;
-        write!(sink, "iqr_range, {}\n", self.iqr_range)?;
-        write!(sink, "mean, {}\n", self.mean)?;
-        write!(sink, "median, {}\n", self.median)?;
-        write!(sink, "stdev, {}\n", self.stdev)?;
-        write!(sink, "\n")?;
+        writeln!(sink, "iqr_lower, {}", self.iqr_lower)?;
+        writeln!(sink, "iqr_upper, {}", self.iqr_upper)?;
+        writeln!(sink, "iqr_range, {}", self.iqr_range)?;
+        writeln!(sink, "mean, {}", self.mean)?;
+        writeln!(sink, "median, {}", self.median)?;
+        writeln!(sink, "stdev, {}", self.stdev)?;
+        writeln!(sink)?;
         Ok(())
     }
 
@@ -369,7 +369,7 @@ impl Stats {
         let msg = "Percentiles";
         write!(sink, "\n{msg}\n{}\n", "=".repeat(msg.len()))?;
         for (percentile, value) in &self.percentiles {
-            write!(sink, "| {percentile:3} | {value:5.2} |\n")?;
+            writeln!(sink, "| {percentile:3} | {value:5.2} |")?;
         }
 
         // Statistics
@@ -386,7 +386,7 @@ impl Stats {
         let longest_key = stats.iter().map(|(key, _)| key.len()).max().unwrap();
         let longest_value = &stats.iter().map(|(_, value)| value.len()).max().unwrap();
         for (key, value) in stats {
-            write!(sink, "| {key:0$} | {value:1$} |\n", longest_key, longest_value)?;
+            writeln!(sink, "| {key:0$} | {value:1$} |", longest_key, longest_value)?;
         }
         Ok(())
     }
