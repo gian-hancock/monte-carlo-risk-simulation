@@ -13,7 +13,7 @@
         let outputElem = document.getElementById("output");
         input.addEventListener("change", (event) => {
           let inputText = event.target.value;
-          let outputText = process_input(inputText);
+          let outputText = process_input(inputText, 100_000);
           outputElem.innerText = outputText;
         });
       });

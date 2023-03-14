@@ -2,14 +2,13 @@ use rand::{thread_rng, Rng};
 use std::{fmt, io::Write};
 use wasm_bindgen::prelude::*;
 
-const SAMPLE_COUNT: usize = 50_000;
 const BUCKET_COUNT: usize = 35;
 const CHART_LINE_LENGTH: usize = 50;
 const PERCENTILES_COUNT: usize = 11;
 const SEPARATORS: [char; 3] = [',', '\t', ';'];
 
 #[wasm_bindgen]
-pub fn process_input(input: &str) -> String {
+pub fn process_input(input: &str, sample_count: usize) -> String {
     let mut result_buffer = Vec::<u8>::new();
     // Parse CSV
     let tasks = parse_tasks_from_csv(input).unwrap();
@@ -21,7 +20,7 @@ pub fn process_input(input: &str) -> String {
         mode: 0.0,
         max: 0.0,
     };
-    let sampled_tasks = run_monte_carlo(&tasks, SAMPLE_COUNT, &total_task);
+    let sampled_tasks = run_monte_carlo(&tasks, sample_count, &total_task);
 
     // // Output samples to file
     // let mut sample_output_file = File::create(OUTPUT_PATH_SAMPLES)?;
