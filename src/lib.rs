@@ -6,6 +6,7 @@ const SAMPLE_COUNT: usize = 50_000;
 const BUCKET_COUNT: usize = 35;
 const CHART_LINE_LENGTH: usize = 50;
 const PERCENTILES_COUNT: usize = 11;
+const SEPARATORS: [char; 3] = [',', '\t', ';'];
 
 #[wasm_bindgen]
 pub fn process_input(input: &str) -> String {
@@ -36,7 +37,8 @@ pub fn process_input(input: &str) -> String {
         &mut result_buffer,
         bucketed_samples.last().unwrap(),
         CHART_LINE_LENGTH,
-    ).unwrap();
+    )
+    .unwrap();
 
     // // Write histogram data to CSV
     // let mut histogram_output_file = File::create(OUTPUT_PATH_HISTOGRAM)?;
@@ -52,49 +54,74 @@ pub fn process_input(input: &str) -> String {
     stats.write_as_ascii(&mut result_buffer).unwrap();
     String::from_utf8(result_buffer).unwrap()
 }
-    
 
 pub fn parse_tasks_from_csv(csv_text: &str) -> Result<Vec<Task>, Error> {
+    struct HeaderInfo {
+        column_idx_name: usize,
+        column_idx_min: usize,
+        column_idx_mode: usize,
+        column_idx_max: usize,
+    }
+
+    fn parse_header_with_separator(header_line: &str, separator: char) -> Result<HeaderInfo, ()> {
+        let headers = header_line.split(separator);
+        let mut column_idx_name = None;
+        let mut column_idx_min = None;
+        let mut column_idx_mode = None;
+        let mut column_idx_max = None;
+        for (column_idx, column) in headers.enumerate() {
+            match column.to_lowercase().as_str() {
+                "name" => column_idx_name = Some(column_idx),
+                "min" => column_idx_min = Some(column_idx),
+                "mode" => column_idx_mode = Some(column_idx),
+                "max" => column_idx_max = Some(column_idx),
+                _ => (),
+            }
+        }
+        if column_idx_name.is_none()
+            || column_idx_min.is_none()
+            || column_idx_mode.is_none()
+            || column_idx_max.is_none()
+        {
+            return Err(());
+        }
+        Ok(HeaderInfo {
+            column_idx_name: column_idx_name.unwrap(),
+            column_idx_min: column_idx_min.unwrap(),
+            column_idx_mode: column_idx_mode.unwrap(),
+            column_idx_max: column_idx_max.unwrap(),
+        })
+    }
+
     let mut lines = csv_text.lines();
 
     // Process header line
+    let mut header_info = None;
+    let mut separator = SEPARATORS[0];
     let header_line = lines.next().ok_or(Error {
         msg: "no header line found".to_string(),
     })?;
-    let headers = header_line.split(',');
-    let mut column_idx_name = None;
-    let mut column_idx_min = None;
-    let mut column_idx_mode = None;
-    let mut column_idx_max = None;
-    for (column_idx, column) in headers.enumerate() {
-        match column.to_lowercase().as_str() {
-            "name" => column_idx_name = Some(column_idx),
-            "min" => column_idx_min = Some(column_idx),
-            "mode" => column_idx_mode = Some(column_idx),
-            "max" => column_idx_max = Some(column_idx),
-            _ => (),
+    for separator_to_try in SEPARATORS {
+        if let Ok(r) = parse_header_with_separator(header_line, separator_to_try) {
+            header_info = Some(r);
+            separator = separator_to_try;
+            break;
         }
     }
-    if column_idx_name.is_none()
-        || column_idx_min.is_none()
-        || column_idx_mode.is_none()
-        || column_idx_max.is_none()
-    {
-        return Err(Error {
-            msg: "missing column value".to_string(),
-        });
-    }
+    let header_info = header_info.ok_or(Error {
+        msg: "invalid header".to_string(),
+    })?;
 
     let mut result = Vec::new();
     // Process tasks
     for task_line in lines {
-        let cells: Vec<&str> = task_line.split(',').collect();
+        let cells: Vec<&str> = task_line.split(separator).collect();
         // FIXME: Unwraps
         result.push(Task {
-            name: cells[column_idx_name.unwrap()].to_owned(),
-            min: cells[column_idx_min.unwrap()].parse().unwrap(),
-            mode: cells[column_idx_mode.unwrap()].parse().unwrap(),
-            max: cells[column_idx_max.unwrap()].parse().unwrap(),
+            name: cells[header_info.column_idx_name].to_owned(),
+            min: cells[header_info.column_idx_min].parse().unwrap(),
+            mode: cells[header_info.column_idx_mode].parse().unwrap(),
+            max: cells[header_info.column_idx_max].parse().unwrap(),
         });
     }
 
@@ -386,7 +413,11 @@ impl Stats {
         let longest_key = stats.iter().map(|(key, _)| key.len()).max().unwrap();
         let longest_value = &stats.iter().map(|(_, value)| value.len()).max().unwrap();
         for (key, value) in stats {
-            writeln!(sink, "| {key:0$} | {value:1$} |", longest_key, longest_value)?;
+            writeln!(
+                sink,
+                "| {key:0$} | {value:1$} |",
+                longest_key, longest_value
+            )?;
         }
         Ok(())
     }
