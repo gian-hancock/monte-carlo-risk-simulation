@@ -7,6 +7,7 @@ const CHART_LINE_LENGTH: usize = 50;
 const PERCENTILES_COUNT: usize = 11;
 const SEPARATORS: [char; 3] = [',', '\t', ';'];
 
+// TODO: Currently unwrap() is used everywhere, but it should be replaced with proper error handling
 #[wasm_bindgen]
 pub fn process_input(input: &str, sample_count: usize) -> String {
     let mut result_buffer = Vec::<u8>::new();

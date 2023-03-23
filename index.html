@@ -8,18 +8,45 @@
   <body>
     <script type="module">
       import init, { process_input } from "./github_pages/estimation_distributions.js";
+
       init().then(() => {
+
+        // Get elements from DOM
         let inputElem = document.getElementById("input");
         let outputElem = document.getElementById("output");
-        input.addEventListener("change", (event) => {
-          let inputText = event.target.value;
+
+        // Add listeners
+        window.addEventListener("hashchange", loadInputFromUrlHash);
+        inputElem.addEventListener("change", e => processInputText(e.target.value));
+
+        // load input from URL hash
+        loadInputFromUrlHash();
+
+        function loadInputFromUrlHash() {
+          if (window.location.hash.length > 0) {
+            let text = decodeURIComponent(window.location.hash.substring(1));
+            inputElem.value = decodeURIComponent(text);
+            inputElem.dispatchEvent(new Event('change'));
+          }
+        }
+
+        function processInputText(inputText) {
+          let text = encodeURIComponent(inputText);
+          window.location.hash = text;
           let outputText = process_input(inputText, 100_000);
           outputElem.innerText = outputText;
-        });
+        }
       });
     </script>
     <h1>Monte Carlo Risk Simulation</h1>
     <textarea id="input" name="input" rows="4" cols="50"></textarea>
     <pre id="output"></pre>
+    <a href="./#name%2Cmin%2Cmode%2Cmax%0Atask%20a%2C0.8%2C2%2C5%0Atask%20b%2C0.25%2C0.8%2C1.5%0Atask%20c%2C0.3%2C0.75%2C2%0Atask%20d%2C0.5%2C1%2C3%0Atask%20e%2C0.8%2C2%2C5%0Atask%20f%2C0.8%2C1.5%2C3%0Atask%20g%2C0.25%2C0.8%2C1.0">
+      Example page 1
+    </a>
+    <br>
+    <a href="./#name%09min%09mode%09max%0Atask a%090.8%092%095%0Atask b%090.25%090.8%091.5%0Atask c%090.3%090.75%092%0Atask d%090.5%091%093%0Atask e%090.8%092%095%0Atask f%090.8%091.5%093%0Atask g%090.25%090.8%091.0">
+      Example page 2
+    </a>
   </body>
 </html>
