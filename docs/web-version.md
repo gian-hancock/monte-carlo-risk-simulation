@@ -4,7 +4,7 @@ The web version of this project is built using `wasm-pack`. The output from `was
 host the web version using Github pages 
 
 # How To Create Web Builds
-Run `wasm-pack` from the project root. The output will appear in the `pkg` directory. See the 
+Run `wasm-pack build` from the project root. The output will appear in the `pkg` directory. See the 
 [Build Environment Setup](#build-environment-setup) section below.
 
 # Github Pages
@@ -15,10 +15,12 @@ files in this directory are manually copied in from `wasm-pack` builds.
 
 # Build Environment Setup
 
-## Installing `wasm-pack` On Windows
-`wasm-pack` can be installed using `cargo install wasm-pack`. 
+## Installing `wasm-pack`
+`wasm-pack` can be installed using `cargo install wasm-pack`.
 
-When I first tried this it failed with: 
+### Windows
+
+When I first tried `cargo install wasm-pack`, it failed with: 
 
 ```plaintext
 error: failed to run custom build command for `openssl-sys v0.9.80`
